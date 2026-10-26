@@ -1,11 +1,5 @@
 package com.example.data.models
 
-import com.example.data.models.Artifact
-import com.example.data.models.LevelDef
-import com.example.data.models.LevelTheme
-import com.example.data.models.Portal
-import com.example.data.models.StarDustPickup
-
 data class CustomLevelData(
   val id: Int,
   val title: String,
@@ -18,7 +12,8 @@ data class CustomLevelData(
   val portalX: Float,
   val portalY: Float,
   val artifacts: List<CustomArtifactData>,
-  val starDustList: List<CustomStarDustData>
+  val starDustList: List<CustomStarDustData>,
+  val customBlocks: List<CustomBlockDefinition> = emptyList()
 )
 
 data class CustomArtifactData(val id: Int, val x: Float, val y: Float)
@@ -52,6 +47,7 @@ fun CustomLevelData.toLevelDef(): LevelDef {
     artifacts = artList,
     starDustList = dustList,
     movingPlatforms = emptyList(),
-    checkpoints = emptyList()
+    checkpoints = emptyList(),
+    customBlocks = customBlocks
   )
 }

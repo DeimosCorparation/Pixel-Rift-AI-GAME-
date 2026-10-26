@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -35,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,12 +62,13 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.CustomLevelStorage
 import com.example.data.GamePreferences
 import com.example.data.models.CustomArtifactData
+import com.example.data.models.CustomBlockDefinition
 import com.example.data.models.CustomLevelData
 import com.example.data.models.CustomStarDustData
 import com.example.engine.RetroAudioEngine
 
 enum class EditTool {
-  PAN, AIR, STONE, GRASS, BRICK, WOOD, SPIKE, CRUMBLING, BOUNCE, CRYSTAL, SPAWN, PORTAL, ARTIFACT, STARDUST
+  PAN, AIR, STONE, GRASS, BRICK, WOOD, SPIKE, CRUMBLING, BOUNCE, CRYSTAL, SPAWN, PORTAL, ARTIFACT, STARDUST, CUSTOM
 }
 
 @Composable
@@ -92,7 +96,8 @@ fun LevelEditorScreen(
     portalX = 54f * 32f,
     portalY = 13f * 32f,
     artifacts = listOf(CustomArtifactData(1, 25f * 32f, 13f * 32f)),
-    starDustList = listOf(CustomStarDustData(1, 12f * 32f, 13f * 32f, 10))
+    starDustList = listOf(CustomStarDustData(1, 12f * 32f, 13f * 32f, 10)),
+    customBlocks = emptyList()
   )
 
   var title by remember { mutableStateOf(targetLevel.title) }
@@ -106,9 +111,12 @@ fun LevelEditorScreen(
   var portalY by remember { mutableStateOf(targetLevel.portalY) }
   var artifacts by remember { mutableStateOf(targetLevel.artifacts) }
   var starDustList by remember { mutableStateOf(targetLevel.starDustList) }
+  var customBlocks by remember { mutableStateOf(targetLevel.customBlocks) }
 
   var activeTool by remember { mutableStateOf(EditTool.STONE) }
+  var activeCustomBlock by remember { mutableStateOf<CustomBlockDefinition?>(customBlocks.firstOrNull()) }
   var showResizeDialog by remember { mutableStateOf(false) }
+  var showCustomBlockDialog by remember { mutableStateOf(false) }
 
   // Canvas pan offset
   var offsetX by remember { mutableFloatStateOf(0f) }
@@ -128,6 +136,7 @@ fun LevelEditorScreen(
       EditTool.CRUMBLING -> 7
       EditTool.BOUNCE -> 8
       EditTool.CRYSTAL -> 9
+      EditTool.CUSTOM -> activeCustomBlock?.id ?: 1
       else -> null
     }
 
@@ -239,7 +248,8 @@ fun LevelEditorScreen(
                 portalX = portalX,
                 portalY = portalY,
                 artifacts = artifacts,
-                starDustList = starDustList
+                starDustList = starDustList,
+                customBlocks = customBlocks
               )
               val updatedList = existingLevels.filter { it.id != levelData.id } + levelData
               storage.saveCustomLevels(updatedList)
@@ -270,7 +280,8 @@ fun LevelEditorScreen(
                 portalX = portalX,
                 portalY = portalY,
                 artifacts = artifacts,
-                starDustList = starDustList
+                starDustList = starDustList,
+                customBlocks = customBlocks
               )
               onTestPlay(levelData)
             },
@@ -333,6 +344,42 @@ fun LevelEditorScreen(
         ToolButton("Портал", EditTool.PORTAL, activeTool) { activeTool = it }
         ToolButton("Реликвия", EditTool.ARTIFACT, activeTool) { activeTool = it }
         ToolButton("Пыль", EditTool.STARDUST, activeTool) { activeTool = it }
+
+        // Render created custom blocks in toolbox
+        customBlocks.forEach { cb ->
+          val isSel = activeTool == EditTool.CUSTOM && activeCustomBlock?.id == cb.id
+          Button(
+            onClick = {
+              activeTool = EditTool.CUSTOM
+              activeCustomBlock = cb
+              audio.playButtonClick()
+            },
+            colors = ButtonDefaults.buttonColors(
+              containerColor = if (isSel) Color(0xFF0284C7) else Color(cb.colorHex)
+            ),
+            shape = RoundedCornerShape(8.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.height(36.dp)
+          ) {
+            Text(text = "✦ ${cb.name}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+          }
+        }
+
+        // Add custom block button
+        Button(
+          onClick = {
+            audio.playButtonClick()
+            showCustomBlockDialog = true
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+          shape = RoundedCornerShape(8.dp),
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+          modifier = Modifier.height(36.dp)
+        ) {
+          Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+          Spacer(modifier = Modifier.width(2.dp))
+          Text(text = "Блок+", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
       }
 
       // Editor Grid Canvas with Drag and Tap Support
@@ -341,7 +388,7 @@ fun LevelEditorScreen(
           .weight(1f)
           .fillMaxWidth()
           .background(Color(0xFF0F172A))
-          .pointerInput(activeTool) {
+          .pointerInput(activeTool, activeCustomBlock) {
             if (activeTool == EditTool.PAN) {
               detectDragGestures { _, dragAmount ->
                 offsetX += dragAmount.x
@@ -369,7 +416,7 @@ fun LevelEditorScreen(
               }
             }
           }
-          .pointerInput(activeTool, cols, rows, tiles) {
+          .pointerInput(activeTool, activeCustomBlock, cols, rows, tiles) {
             if (activeTool != EditTool.PAN) {
               detectTapGestures(
                 onTap = { offset ->
@@ -398,15 +445,19 @@ fun LevelEditorScreen(
 
               // Viewport culling for performance up to 400x400 blocks!
               if (x + ts >= 0 && x <= size.width && y + ts >= 0 && y <= size.height) {
-                val color = when (tileId) {
-                  1 -> Color(0xFF64748B) // Stone
-                  2 -> Color(0xFF22C55E) // Grass
-                  3 -> Color(0xFF475569) // Brick
-                  4 -> Color(0xFFD97706) // Wood
-                  5 -> Color(0xFFEF4444) // Spike
-                  7 -> Color(0xFF78716C) // Crumbling
-                  8 -> Color(0xFFEC4899) // Bounce
-                  9 -> Color(0xFF8B5CF6) // Crystal
+                val color = when {
+                  tileId >= 50 -> {
+                    val cb = customBlocks.find { it.id == tileId }
+                    if (cb != null) Color(cb.colorHex) else Color(0xFF6366F1)
+                  }
+                  tileId == 1 -> Color(0xFF64748B) // Stone
+                  tileId == 2 -> Color(0xFF22C55E) // Grass
+                  tileId == 3 -> Color(0xFF475569) // Brick
+                  tileId == 4 -> Color(0xFFD97706) // Wood
+                  tileId == 5 -> Color(0xFFEF4444) // Spike
+                  tileId == 7 -> Color(0xFF78716C) // Crumbling
+                  tileId == 8 -> Color(0xFFEC4899) // Bounce
+                  tileId == 9 -> Color(0xFF8B5CF6) // Crystal
                   else -> Color(0xFF0F172A) // Air
                 }
                 drawRect(color = color, topLeft = Offset(x, y), size = Size(ts, ts))
@@ -494,6 +545,22 @@ fun LevelEditorScreen(
         onDismiss = { showResizeDialog = false }
       )
     }
+
+    // Custom Block Creator Dialog
+    if (showCustomBlockDialog) {
+      CustomBlockCreatorDialog(
+        onCreated = { newBlock ->
+          val nextId = 50 + customBlocks.size
+          val blockWithId = newBlock.copy(id = nextId)
+          customBlocks = customBlocks + blockWithId
+          activeCustomBlock = blockWithId
+          activeTool = EditTool.CUSTOM
+          audio.playButtonClick()
+          showCustomBlockDialog = false
+        },
+        onDismiss = { showCustomBlockDialog = false }
+      )
+    }
   }
 }
 
@@ -515,6 +582,216 @@ private fun ToolButton(
     modifier = Modifier.height(36.dp)
   ) {
     Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+  }
+}
+
+@Composable
+fun CustomBlockCreatorDialog(
+  onCreated: (CustomBlockDefinition) -> Unit,
+  onDismiss: () -> Unit
+) {
+  var nameText by remember { mutableStateOf("Мой Блок") }
+  var selectedColor by remember { mutableStateOf(0xFF6366F1L) }
+  var canDamage by remember { mutableStateOf(false) }
+  var damageAmountText by remember { mutableStateOf("1") }
+  var givesBoost by remember { mutableStateOf(false) }
+  var boostType by remember { mutableStateOf("SPEED") } // SPEED, SHIELD, JUMP
+  var boostValueText by remember { mutableStateOf("1.5") }
+
+  val colors = listOf(
+    0xFF6366F1L, // Indigo
+    0xFFEC4899L, // Pink
+    0xFF8B5CF6L, // Purple
+    0xFF10B981L, // Emerald
+    0xFFF59E0BL, // Amber
+    0xFFEF4444L, // Red
+    0xFF06B6D4L, // Cyan
+    0xFF64748BL  // Slate
+  )
+
+  Dialog(onDismissRequest = onDismiss) {
+    Box(
+      modifier = Modifier
+        .width(380.dp)
+        .clip(RoundedCornerShape(20.dp))
+        .background(
+          Brush.verticalGradient(
+            listOf(Color(0xFF0F172A), Color(0xFF1E1B4B))
+          )
+        )
+        .border(1.5.dp, Color(0xFF6366F1), RoundedCornerShape(20.dp))
+        .padding(20.dp)
+    ) {
+      Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Text(
+            text = "СОЗДАНИЕ БЛОКА",
+            color = Color.White,
+            fontWeight = FontWeight.Black,
+            fontSize = 18.sp
+          )
+          IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Color(0xFF94A3B8))
+          }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
+          value = nameText,
+          onValueChange = { nameText = it },
+          label = { Text("Название блока", fontSize = 11.sp) },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Color selection palette
+        Text(
+          text = "Выбор цвета блока:",
+          color = Color(0xFFA5B4FC),
+          fontSize = 12.sp,
+          fontWeight = FontWeight.Bold,
+          modifier = Modifier.align(Alignment.Start)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+          colors.forEach { col ->
+            val isSelected = selectedColor == col
+            Box(
+              modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(Color(col))
+                .border(
+                  width = if (isSelected) 3.dp else 1.dp,
+                  color = if (isSelected) Color.White else Color.Transparent,
+                  shape = CircleShape
+                )
+                .pointerInput(col) {
+                  detectTapGestures(onTap = { selectedColor = col })
+                }
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Can Damage Section
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Text("Может дажить?", color = Color.White, fontSize = 13.sp)
+          Switch(
+            checked = canDamage,
+            onCheckedChange = { canDamage = it }
+          )
+        }
+        if (canDamage) {
+          Spacer(modifier = Modifier.height(4.dp))
+          OutlinedTextField(
+            value = damageAmountText,
+            onValueChange = { damageAmountText = it.filter { ch -> ch.isDigit() } },
+            label = { Text("Сколько урона?", fontSize = 11.sp) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+          )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Gives Boost Section
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Text("Даёт буст?", color = Color.White, fontSize = 13.sp)
+          Switch(
+            checked = givesBoost,
+            onCheckedChange = { givesBoost = it }
+          )
+        }
+        if (givesBoost) {
+          Spacer(modifier = Modifier.height(6.dp))
+          Text(
+            text = "Какой именно?",
+            color = Color(0xFFA5B4FC),
+            fontSize = 11.sp,
+            modifier = Modifier.align(Alignment.Start)
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            val boostOptions = listOf("SPEED" to "Ускорение", "SHIELD" to "Щит", "JUMP" to "Прыжок")
+            boostOptions.forEach { (typeKey, typeLabel) ->
+              val isSel = boostType == typeKey
+              OutlinedButton(
+                onClick = { boostType = typeKey },
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                  containerColor = if (isSel) Color(0xFF6366F1) else Color(0x33334155)
+                ),
+                modifier = Modifier.weight(1f).height(36.dp)
+              ) {
+                Text(typeLabel, fontSize = 10.sp, color = Color.White)
+              }
+            }
+          }
+          Spacer(modifier = Modifier.height(6.dp))
+          OutlinedTextField(
+            value = boostValueText,
+            onValueChange = { boostValueText = it },
+            label = { Text(if (boostType == "SHIELD") "Сколько сердец/щита?" else "Множитель ускорения/прыжка?", fontSize = 10.sp) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+          )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+          onClick = {
+            val dmg = damageAmountText.toIntOrNull() ?: 1
+            val bVal = boostValueText.toFloatOrNull() ?: 1.5f
+            onCreated(
+              CustomBlockDefinition(
+                id = 50,
+                name = nameText.ifBlank { "Блок" },
+                colorHex = selectedColor,
+                canDamage = canDamage,
+                damageAmount = dmg,
+                givesBoost = givesBoost,
+                boostType = boostType,
+                boostValue = bVal
+              )
+            )
+          },
+          shape = RoundedCornerShape(12.dp),
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+          modifier = Modifier.fillMaxWidth().height(46.dp)
+        ) {
+          Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+          Spacer(modifier = Modifier.width(6.dp))
+          Text("СОЗДАТЬ И ДОБАВИТЬ БЛОК", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+      }
+    }
   }
 }
 

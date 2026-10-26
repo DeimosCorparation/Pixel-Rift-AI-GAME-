@@ -616,6 +616,7 @@ class GameEngine(
   private fun isTileSolidAt(tx: Int, ty: Int, isVerticalMoveDown: Boolean = false, prevBottom: Float = 0f): Boolean {
     if (tx < 0 || tx >= level.tileCols || ty < 0 || ty >= level.tileRows) return false
     val tileId = level.tiles[ty][tx]
+    if (tileId >= 50) return true
     val type = TileType.fromId(tileId)
 
     if (type == TileType.CRUMBLING) {
@@ -859,10 +860,30 @@ class GameEngine(
     val minTileY = (playerY / level.tileSize).toInt().coerceAtLeast(0)
     val maxTileY = ((playerY + playerHeight) / level.tileSize).toInt().coerceAtMost(level.tileRows - 1)
 
-    // Check spike hazards
+    // Check spike hazards and custom blocks
     for (ty in minTileY..maxTileY) {
       for (tx in minTileX..maxTileX) {
-        val tile = TileType.fromId(level.tiles[ty][tx])
+        val tileId = level.tiles[ty][tx]
+        if (tileId >= 50) {
+          val cb = level.customBlocks.find { it.id == tileId }
+          if (cb != null) {
+            if (cb.canDamage) {
+              triggerDamage()
+              return
+            }
+            if (cb.givesBoost) {
+              if (cb.boostType == "SPEED") {
+                playerVx = (if (facingRight) 1f else -1f) * baseRunSpeed * cb.boostValue
+              } else if (cb.boostType == "SHIELD") {
+                hasBarrierShield = true
+                currentHearts = (currentHearts + cb.boostValue.toInt()).coerceAtMost(maxHearts)
+              } else if (cb.boostType == "JUMP") {
+                playerVy = baseJumpVelocity * cb.boostValue
+              }
+            }
+          }
+        }
+        val tile = TileType.fromId(tileId)
         if (tile.isHazard) {
           triggerDamage()
           return

@@ -314,6 +314,17 @@ private fun DrawScope.drawTiles(
       val tx = c * tileSize
       val ty = r * tileSize
 
+      if (tileId >= 50) {
+        val customBlock = level.customBlocks.find { it.id == tileId }
+        val blockColor = if (customBlock != null) Color(customBlock.colorHex) else Color(0xFF6366F1)
+        drawRect(color = blockColor, topLeft = Offset(tx, ty), size = Size(tileSize, tileSize))
+        drawRect(color = Color.White.copy(alpha = 0.4f), topLeft = Offset(tx, ty), size = Size(tileSize, 3f))
+        drawRect(color = Color.White.copy(alpha = 0.4f), topLeft = Offset(tx, ty), size = Size(3f, tileSize))
+        drawRect(color = Color.Black.copy(alpha = 0.4f), topLeft = Offset(tx, ty + tileSize - 3f), size = Size(tileSize, 3f))
+        drawRect(color = Color.Black.copy(alpha = 0.4f), topLeft = Offset(tx + tileSize - 3f, ty), size = Size(3f, tileSize))
+        continue
+      }
+
       when (type) {
         TileType.STONE -> drawStoneTile(tx, ty, tileSize)
         TileType.DIRT_GRASS -> drawGrassTile(tx, ty, tileSize)

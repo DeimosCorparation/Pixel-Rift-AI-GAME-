@@ -81,6 +81,17 @@ enum class LevelTheme {
   VOID_GATEWAYS
 }
 
+data class CustomBlockDefinition(
+  val id: Int, // 50, 51, 52...
+  val name: String,
+  val colorHex: Long,
+  val canDamage: Boolean,
+  val damageAmount: Int,
+  val givesBoost: Boolean,
+  val boostType: String, // "SPEED", "SHIELD", "JUMP"
+  val boostValue: Float
+)
+
 data class LevelDef(
   val id: Int,
   val titleRu: String,
@@ -96,5 +107,6 @@ data class LevelDef(
   val artifacts: List<Artifact>,
   val starDustList: List<StarDustPickup>,
   val movingPlatforms: List<MovingPlatform>,
-  val checkpoints: List<Checkpoint>
+  val checkpoints: List<Checkpoint>,
+  val customBlocks: List<CustomBlockDefinition> = emptyList()
 )
