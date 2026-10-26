@@ -50,8 +50,8 @@ class AppUpdateManager(private val context: Context, private val prefs: GamePref
     val url = if (rawUrl.isNotBlank()) {
       rawUrl
     } else {
-      // Default placeholder update check endpoint
-      "https://raw.githubusercontent.com/mishamine16/pixel-rift/main/version.json"
+      // Default GitHub releases API endpoint
+      "https://api.github.com/repos/mishamine16/pixel-rift/releases/latest"
     }
 
     CoroutineScope(Dispatchers.IO).launch {
