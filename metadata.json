@@ -1,0 +1,6 @@
+{
+  "name": "Pixel Rift",
+  "description": "2D pixel-art platformer with artifact portals, ability upgrades, and dynamic day-night cycle",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
