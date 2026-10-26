@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +66,7 @@ import com.example.data.models.CustomArtifactData
 import com.example.data.models.CustomBlockDefinition
 import com.example.data.models.CustomLevelData
 import com.example.data.models.CustomStarDustData
+import com.example.data.models.TileType
 import com.example.engine.RetroAudioEngine
 
 enum class EditTool {
@@ -445,28 +447,37 @@ fun LevelEditorScreen(
 
               // Viewport culling for performance up to 400x400 blocks!
               if (x + ts >= 0 && x <= size.width && y + ts >= 0 && y <= size.height) {
-                val color = when {
-                  tileId >= 50 -> {
+                if (tileId > 0) {
+                  val type = TileType.fromId(tileId)
+                  if (tileId >= 50) {
                     val cb = customBlocks.find { it.id == tileId }
-                    if (cb != null) Color(cb.colorHex) else Color(0xFF6366F1)
+                    val blockColor = if (cb != null) Color(cb.colorHex) else Color(0xFF6366F1)
+                    drawRect(color = blockColor, topLeft = Offset(x, y), size = Size(ts, ts))
+                    drawRect(color = Color.White.copy(alpha = 0.4f), topLeft = Offset(x, y), size = Size(ts, 3f))
+                    drawRect(color = Color.White.copy(alpha = 0.4f), topLeft = Offset(x, y), size = Size(3f, ts))
+                    drawRect(color = Color.Black.copy(alpha = 0.4f), topLeft = Offset(x, y + ts - 3f), size = Size(ts, 3f))
+                    drawRect(color = Color.Black.copy(alpha = 0.4f), topLeft = Offset(x + ts - 3f, y), size = Size(3f, ts))
+                  } else {
+                    when (type) {
+                      TileType.STONE -> drawStoneTile(x, y, ts)
+                      TileType.DIRT_GRASS -> drawGrassTile(x, y, ts)
+                      TileType.BRICK -> drawBrickTile(x, y, ts)
+                      TileType.WOOD_PLATFORM -> drawWoodPlatformTile(x, y, ts)
+                      TileType.SPIKE_UP -> drawSpikeTile(x, y, ts, isUp = true)
+                      TileType.SPIKE_DOWN -> drawSpikeTile(x, y, ts, isUp = false)
+                      TileType.CRUMBLING -> drawCrumblingTile(x, y, ts)
+                      TileType.BOUNCE_PAD -> drawBouncePadTile(x, y, ts)
+                      TileType.CRYSTAL_WALL -> drawCrystalTile(x, y, ts)
+                      else -> {}
+                    }
                   }
-                  tileId == 1 -> Color(0xFF64748B) // Stone
-                  tileId == 2 -> Color(0xFF22C55E) // Grass
-                  tileId == 3 -> Color(0xFF475569) // Brick
-                  tileId == 4 -> Color(0xFFD97706) // Wood
-                  tileId == 5 -> Color(0xFFEF4444) // Spike
-                  tileId == 7 -> Color(0xFF78716C) // Crumbling
-                  tileId == 8 -> Color(0xFFEC4899) // Bounce
-                  tileId == 9 -> Color(0xFF8B5CF6) // Crystal
-                  else -> Color(0xFF0F172A) // Air
+                  drawRect(
+                    color = Color(0x15FFFFFF),
+                    topLeft = Offset(x, y),
+                    size = Size(ts, ts),
+                    style = Stroke(1f)
+                  )
                 }
-                drawRect(color = color, topLeft = Offset(x, y), size = Size(ts, ts))
-                drawRect(
-                  color = Color(0x22FFFFFF),
-                  topLeft = Offset(x, y),
-                  size = Size(ts, ts),
-                  style = Stroke(1f)
-                )
               }
             }
           }
@@ -562,6 +573,98 @@ fun LevelEditorScreen(
       )
     }
   }
+}
+
+// Block Graphic Drawing Helpers for Level Editor
+private fun DrawScope.drawStoneTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFF64748B), topLeft = Offset(x, y), size = Size(size, size))
+  drawRect(color = Color(0xFF94A3B8), topLeft = Offset(x, y), size = Size(size, 3f))
+  drawRect(color = Color(0xFF94A3B8), topLeft = Offset(x, y), size = Size(3f, size))
+  drawRect(color = Color(0xFF334155), topLeft = Offset(x, y + size - 3f), size = Size(size, 3f))
+  drawRect(color = Color(0xFF334155), topLeft = Offset(x + size - 3f, y), size = Size(3f, size))
+  drawRect(color = Color(0xFF475569), topLeft = Offset(x + 4f, y + size / 2f), size = Size(size - 8f, 2f))
+  drawRect(color = Color(0xFF475569), topLeft = Offset(x + size / 2f, y + 4f), size = Size(2f, size / 2f - 4f))
+}
+
+private fun DrawScope.drawGrassTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFF78350F), topLeft = Offset(x, y), size = Size(size, size))
+  drawRect(color = Color(0xFF451A03), topLeft = Offset(x, y + size - 3f), size = Size(size, 3f))
+  drawRect(color = Color(0xFF15803D), topLeft = Offset(x, y), size = Size(size, 6f))
+  drawRect(color = Color(0xFF22C55E), topLeft = Offset(x, y), size = Size(size, 3f))
+  drawRect(color = Color(0xFF15803D), topLeft = Offset(x + 4f, y + 6f), size = Size(3f, 4f))
+  drawRect(color = Color(0xFF15803D), topLeft = Offset(x + 14f, y + 6f), size = Size(4f, 3f))
+  drawRect(color = Color(0xFF15803D), topLeft = Offset(x + 24f, y + 6f), size = Size(3f, 5f))
+}
+
+private fun DrawScope.drawBrickTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFF475569), topLeft = Offset(x, y), size = Size(size, size))
+  drawRect(color = Color(0xFF1E293B), topLeft = Offset(x, y), size = Size(size, size), style = Stroke(2f))
+  drawRect(color = Color(0xFF10B981).copy(alpha = 0.35f), topLeft = Offset(x + 4f, y + 4f), size = Size(6f, 6f))
+  drawRect(color = Color(0xFF1E293B), topLeft = Offset(x, y + size / 2f), size = Size(size, 2f))
+}
+
+private fun DrawScope.drawWoodPlatformTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFFB45309), topLeft = Offset(x, y), size = Size(size, 8f))
+  drawRect(color = Color(0xFFD97706), topLeft = Offset(x, y), size = Size(size, 3f))
+  drawRect(color = Color(0xFF78350F), topLeft = Offset(x, y + 6f), size = Size(size, 2f))
+  drawCircle(color = Color(0xFF451A03), radius = 1.5f, center = Offset(x + 5f, y + 4f))
+  drawCircle(color = Color(0xFF451A03), radius = 1.5f, center = Offset(x + size - 5f, y + 4f))
+}
+
+private fun DrawScope.drawSpikeTile(x: Float, y: Float, size: Float, isUp: Boolean) {
+  val spikeCount = 3
+  val singleWidth = size / spikeCount
+  for (i in 0 until spikeCount) {
+    val sx = x + i * singleWidth
+    val path = androidx.compose.ui.graphics.Path()
+    if (isUp) {
+      path.moveTo(sx, y + size)
+      path.lineTo(sx + singleWidth / 2f, y)
+      path.lineTo(sx + singleWidth, y + size)
+      path.close()
+    } else {
+      path.moveTo(sx, y)
+      path.lineTo(sx + singleWidth / 2f, y + size)
+      path.lineTo(sx + singleWidth, y)
+      path.close()
+    }
+    drawPath(path = path, color = Color(0xFFEF4444))
+    drawCircle(
+      color = Color(0xFFFCA5A5),
+      radius = 1.5f,
+      center = Offset(sx + singleWidth / 2f, if (isUp) y + 3f else y + size - 3f)
+    )
+  }
+}
+
+private fun DrawScope.drawCrumblingTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFF78716C), topLeft = Offset(x, y), size = Size(size, size))
+  val crackColor = Color(0xFF292524)
+  drawLine(color = crackColor, start = Offset(x + 4f, y + 2f), end = Offset(x + 16f, y + 18f), strokeWidth = 2f)
+  drawLine(color = crackColor, start = Offset(x + 16f, y + 18f), end = Offset(x + 28f, y + 8f), strokeWidth = 2f)
+  drawLine(color = crackColor, start = Offset(x + 16f, y + 18f), end = Offset(x + 20f, y + size - 2f), strokeWidth = 2f)
+}
+
+private fun DrawScope.drawBouncePadTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFFF1F5F9), topLeft = Offset(x + 8f, y + 12f), size = Size(size - 16f, size - 12f))
+  drawArc(
+    color = Color(0xFFEC4899),
+    startAngle = 180f,
+    sweepAngle = 180f,
+    useCenter = true,
+    topLeft = Offset(x + 2f, y),
+    size = Size(size - 4f, 18f)
+  )
+  drawCircle(color = Color.White, radius = 2.5f, center = Offset(x + size / 2f, y + 4f))
+  drawCircle(color = Color.White, radius = 2f, center = Offset(x + 8f, y + 7f))
+  drawCircle(color = Color.White, radius = 2f, center = Offset(x + size - 8f, y + 7f))
+}
+
+private fun DrawScope.drawCrystalTile(x: Float, y: Float, size: Float) {
+  drawRect(color = Color(0xFF1E1B4B), topLeft = Offset(x, y), size = Size(size, size))
+  drawRect(color = Color(0xFF8B5CF6), topLeft = Offset(x + 6f, y + 6f), size = Size(8f, 12f))
+  drawRect(color = Color(0xFF06B6D4), topLeft = Offset(x + 18f, y + 14f), size = Size(10f, 10f))
+  drawRect(color = Color.White.copy(alpha = 0.6f), topLeft = Offset(x + 8f, y + 7f), size = Size(2f, 4f))
 }
 
 @Composable
